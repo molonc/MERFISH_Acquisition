@@ -1,4 +1,4 @@
 # MERFISH
 MERFISH software for Nikon and ONI
 
-Launch ImageCapture.m in MATLAB
+To run it in MATLAB: Launch matlab_for_nikon/ImageCapture.m in MATLAB
