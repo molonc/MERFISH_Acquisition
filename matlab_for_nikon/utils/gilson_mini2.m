@@ -1,0 +1,6 @@
+s = serial('COM9');
+set(s,'BaudRate',19200,'DataBits',8,'StopBits',1,'Parity',...
+    'even','Flowcontrol','none',...
+    'Terminator','','Timeout',0.5);
+fopen(s);
+fwrite(s,158)

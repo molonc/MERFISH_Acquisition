@@ -1,0 +1,49 @@
+function sAverages = loadScaleval()
+    path = 'Z:\Katey&Sonia\DATA';
+    sVals = zeros(1, 5);
+    
+    dir_folders = getfolders(path);
+    crawlfolder(dir_folders, path);
+    sVals(1,:) =[];
+    [M, N] = size(sVals)
+    
+    sSums = sum(sVals);
+    
+    sAverages = sSums ./ M;
+    
+    save('ScaleAverages.mat', 'sAverages', '-v7.3')
+    movefile([cd, '\ScaleAverages.mat'], path)
+
+    function crawlfolder(folders, path)
+        if( checkfolders(folders) )
+            disp(['Loading...', path])
+            cat(path);
+        else
+            for i=1:numel(folders)
+                sfolders = getfolders([path,'\',folders(i).name]);
+                crawlfolder(sfolders, [path,'\',folders(i).name]);
+            end
+        end
+    end
+
+    function [isStitch] = checkfolders(folders)
+        isStitch = 0;
+        for f=1:numel(folders)
+            if(strcmp( folders(f).name, '(1, 1)' ))
+                isStitch = 1;
+            end
+        end
+    end
+
+    function cat(path)
+
+        s = strsplit(path, '\');
+
+        load( [path, '\', s{end-1}, '_', s{end}, '_5-Components_6-Wavelengths_Constraints=Positivity,StaticSpectra\scaleVal.mat'] )
+        scaleval = scaleval;
+        cat(1, sVals, scaleVal(:,2)')
+
+
+    end
+
+end
