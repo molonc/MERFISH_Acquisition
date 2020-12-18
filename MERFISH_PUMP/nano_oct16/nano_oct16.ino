@@ -11,12 +11,19 @@
 #define STATE1 12               // first state pin
 #define STATE2 13               // second state pin
 
-#define GO_UP LOW
-#define GO_DOWN HIGH
+#define UP LOW
+#define DOWN HIGH
 
 const int speedChart[] = {1000, 5000, 10000, 12500};        // TODO: this set of speeds is for 10mL syringe. find another set for 30mL syringe
 volatile bool killed = false;     // other emergency
 volatile bool paused = false;     // power outage pause
+
+enum STATES {
+  GO_TO_BOTTOM,
+  GO_TO_TOP,
+  GO_DOWN,
+  STOP
+};
 
 void setup() {
 //    INPUTS
@@ -68,23 +75,27 @@ void loop() {
 
       // switch states:
       switch (run_state) {
-          case 0:
+          case GO_TO_BOTTOM:
               tap(100);             // TODO: define a good PWM wave for the tapper, 100 is default value for now
               goToBottom(delayTime, iter);
               break;
-          case 1:
+          case GO_TO_TOP:
               tap(100);
               goToTop(delayTime, iter);
               break;
-          case 2:
+          case GO_DOWN:
               tap(100);
               goDown(delayTime, iter);
               break;
-          case 3:
+          case STOP:
               tap(0);
               stop();
               break;
       }
+  }
+  else {
+      if (paused) slow_blink();
+      if (killed) fast_blink();
   }
 }
 
@@ -132,7 +143,7 @@ void runMotor(int delayTime, int iter) {
 
 void goToTop(int delayTime, int iter) {
   // drive motor up until the top switch has been triggered
-    digitalWrite(DIR, GO_UP);
+    digitalWrite(DIR, UP);
     while (digitalRead(TOP_SWITCH) != HIGH && !killed && !paused) {
         runMotor(delayTime, iter);  
     }
@@ -141,7 +152,7 @@ void goToTop(int delayTime, int iter) {
 
 void goToBottom(int delayTime, int iter) {
   // drive motor down until the bottom switch has been triggered
-    digitalWrite(DIR, GO_DOWN);
+    digitalWrite(DIR, DOWN);
     while (digitalRead(BOT_SWITCH) != HIGH && !killed && !paused) {
         runMotor(delayTime, iter);
     }  
@@ -150,7 +161,7 @@ void goToBottom(int delayTime, int iter) {
 
 void goDown(int delayTime, int iter) {
   // driver motor down
-    digitalWrite(DIR, GO_DOWN);
+    digitalWrite(DIR, DOWN);
     runMotor(delayTime, iter);  
 }
 
@@ -167,13 +178,11 @@ void power_action() {
         stop(); 
         tap(0);
         paused = true;
-        slow_blink();
     }  
     else {
         // this means it was a FALLING edge
         // resume program immediately  
         paused = false;
-        no_blink();
     }
 }
 
@@ -186,13 +195,11 @@ void emergency_action() {
         stop();
         tap(0);
         killed = true;
-        fast_blink();
     }  
 
     else {
         // this means leakage has been cleared
         // resume program
         killed = false;
-        no_blink();  
     }
 }
