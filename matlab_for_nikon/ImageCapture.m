@@ -44,6 +44,11 @@ else
     gui_mainfcn(gui_State, varargin{:});
 end
 % End initialization code - DO NOT EDIT
+
+addpath(fullfile(pwd, 'helpers'));
+addpath(fullfile(pwd, 'utils'));
+addpath(fullfile(pwd, 'Andor_SDK_Fcn'));
+
 end
 
 function ImageCapture_OpeningFcn(hObject, eventdata, handles, varargin)

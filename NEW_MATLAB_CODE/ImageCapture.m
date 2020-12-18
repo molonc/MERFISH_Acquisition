@@ -42,13 +42,17 @@ else
     gui_mainfcn(gui_State, varargin{:});
 end
 % End initialization code - DO NOT EDIT
+
+addpath(fullfile(pwd, 'Andor_SDK_Fcn'));
+addpath(fullfile(pwd, 'hardware'));
+addpath(fullfile(pwd, 'utils'));
+addpath(fullfile(pwd, 'fluidics'));
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function ImageCapture_OpeningFcn(hObject, eventdata, handles, varargin)
-
-addpath(fullfile(pwd, 'utils'));
 
 fileName = fullfile(pwd, 'previousSettings.mat');
 if exist(fileName,'file')==2
@@ -192,7 +196,7 @@ end
 %clean up and shut down laser
 if isfield(handles,'sblue')
     try
-        fprintf(handles.sblue,'?LOf')
+        fprintf(handles.sblue,'?LOf');
         fclose(handles.sblue);
         delete(handles.sblue);
     catch
@@ -201,7 +205,7 @@ if isfield(handles,'sblue')
 end
 if isfield(handles,'sgreen')
     try
-        fprintf(handles.sgreen,'l0')
+        fprintf(handles.sgreen,'l0');
         fclose(handles.sgreen);
         delete(handles.sgreen);
     catch
@@ -210,7 +214,7 @@ if isfield(handles,'sgreen')
 end
 if isfield(handles,'sred')
     try
-        fprintf(handles.sir,'?LOf')
+        fprintf(handles.sir,'?LOf');
         fclose(handles.sred);
         delete(handles.sred);
     catch
@@ -219,7 +223,7 @@ if isfield(handles,'sred')
 end
 if isfield(handles,'sir')
     try
-        fprintf(handles.sir,'?LOf')
+        fprintf(handles.sir,'?LOf');
         fclose(handles.sir);
         delete(handles.sir);
     catch
@@ -232,8 +236,8 @@ if isfield(handles,'s2')
     s2 = handles.s2;
     handles = rmfield(handles,'s2');
     try
-        fclose(s2)
-        delete(s2)
+        fclose(s2);
+        delete(s2);
     catch
         'Error in closing the stage serial port!'
     end
@@ -1192,7 +1196,7 @@ current_expo = AT_GetFloat(handles.AndorNeoParamHandle,'ExposureTime');
 [rc] = AT_Command(handles.AndorNeoParamHandle,'AcquisitionStart');
 
 for i = 1:3
-    switch_laser(handles,wavelength(i))
+    [hObject, handles] = switch_laser(hObject, handles,wavelength(i));
     switch wavelength(i)
         case 473
             exposure = handles.sbexpo;
@@ -1227,7 +1231,7 @@ for i = 1:3
 end
 set(handles.ti2,'iSHUTTER_EPI',0);
 [rc] = AT_Command(handles.AndorNeoParamHandle,'AcquisitionStop');
-switch_laser(handles,0);
+[hObject, handles] = switch_laser(hObject, handles,0);
 [rc] = AT_SetFloat(handles.AndorNeoParamHandle,'ExposureTime',current_expo);
 
 disp('Done')
@@ -1470,7 +1474,7 @@ end
 function threeD_pushbutton_Callback(hObject, eventdata, handles)
 set(handles.ti2,'iLIGHTPATH',4);
 [rc] = AT_SetFloat(handles.AndorNeoParamHandle, 'ExposureTime',handles.sbexpo);
-switch_laser(handles,473);
+[hObject, handles] = switch_laser(hObject, handles,473);
 [rc,handles.imagesize] = AT_GetInt(handles.AndorNeoParamHandle,'ImageSizeBytes');
 [rc,handles.height] = AT_GetInt(handles.AndorNeoParamHandle,'AOIHeight');
 [rc,handles.width] = AT_GetInt(handles.AndorNeoParamHandle,'AOIWidth');

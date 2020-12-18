@@ -1,45 +1,52 @@
-#define killSwitch_inter 2
-//#define interruptPin 3
-#define DIR 6   // TODO: update all the pins
-#define STEP 7
-#define ON_OFF 8
-#define TOP_SWITCH 4
-#define BOT_SWITCH 5
-#define STATE1 9
-#define STATE2 10
-#define SPEED1 11
-#define SPEED2 12
+#define power_inter 2           // power outage interrupt
+#define emergency_inter 3       // other interrupts (leakage, etc.)
+#define TOP_SWITCH 4            // top limit switch (connects to both Mega and Nano)
+#define BOT_SWITCH 5            // bottom limit switch (connects to both Mega and Nano)
+#define DIR 6                   // direction pin on motor driver
+#define STEP 7                  // step pin on motor driver
+#define SPEED1 8                // first speed bit
+#define SPEED2 9                // second speed bit
+#define LED 10                  // LED for showing state
+#define TAPPER 11               // tapper motor PWM pin
+#define STATE1 12               // first state pin
+#define STATE2 13               // second state pin
+
 #define GO_UP LOW
 #define GO_DOWN HIGH
 
-int speedChart[] = {1000, 5000, 10000, 12500};
-volatile bool killed = false;
+const int speedChart[] = {1000, 5000, 10000, 12500};        // TODO: this set of speeds is for 10mL syringe. find another set for 30mL syringe
+volatile bool killed = false;     // other emergency
+volatile bool paused = false;     // power outage pause
 
 void setup() {
-    Serial.begin(9600);
 //    INPUTS
-    pinMode(killSwitch_inter, INPUT);
-    attachInterrupt(digitalPinToInterrupt(killSwitch_inter), action, CHANGE);
-
-    pinMode(ON_OFF, INPUT);
+    pinMode(power_inter, INPUT);
+    pinMode(emergency_inter, INPUT);
+    attachInterrupt(digitalPinToInterrupt(power_inter), power_action, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(emergency_inter), emergency_action, CHANGE);
     pinMode(TOP_SWITCH, INPUT);
     pinMode(BOT_SWITCH, INPUT);
     pinMode(STATE1, INPUT_PULLUP);
     pinMode(STATE2, INPUT_PULLUP);
     pinMode(SPEED1, INPUT_PULLUP);
     pinMode(SPEED2, INPUT_PULLUP);
+    
 //    OUTPUTS
+    pinMode(LED, OUTPUT);
     pinMode(STEP, OUTPUT);
     pinMode(DIR, OUTPUT);
+    pinMode(TAPPER, OUTPUT);
 
 //    Initialization
-    Serial.println("initializing");
+    init_blink();
     goToBottom(speedChart[0], 1);
-    Serial.println("done initializing");
+    no_blink();
 }
 
 void loop() {
-  if (digitalRead(ON_OFF) == HIGH && !killed) {
+  if (!paused && !killed) {
+      no_blink();
+
       // states:
       // 00: go to bottom ONLY
       // 01: go to top ONLY
@@ -54,33 +61,69 @@ void loop() {
       int run_speed = (speed1bit | speed2bit);
       int iter = 1;
       int delayTime = speedChart[run_speed];
-      if (delayTime > 15000) {
+      if (delayTime > 15000) {      // simply because delayMicroseconds doesn't work too well with the delayTime being too large
           delayTime = delayTime / 2;
           iter = 2;  
       }
-      Serial.println(delayTime);
 
       // switch states:
       switch (run_state) {
           case 0:
+              tap(100);             // TODO: define a good PWM wave for the tapper, 100 is default value for now
               goToBottom(delayTime, iter);
-              delay(60000);
               break;
           case 1:
+              tap(100);
               goToTop(delayTime, iter);
-              delay(60000);
               break;
           case 2:
+              tap(100);
               goDown(delayTime, iter);
               break;
           case 3:
+              tap(0);
               stop();
               break;
       }
   }
 }
 
+void blink(int delayTime) {
+  // overwrite the built-in blink library function
+  // blink the LED with delayTime in millisecond
+    digitalWrite(LED, HIGH);
+    delay(delayTime);
+    digitalWrite(LED, LOW);
+    delay(delayTime);
+}
+
+void init_blink() {
+  // indicate that system is initializing
+    blink(500);
+}
+
+void no_blink() {
+  // steady LED light with no blink
+    digitalWrite(LED, HIGH);
+}
+
+void slow_blink() {
+  // slow blinking when system is paused
+    blink(1000);
+}
+
+void fast_blink() {
+  // fast blinking when an emergency has occured (leakage)
+    blink(250);
+}
+
+void tap(int dutyCycle) {
+  // dutyCycle: 0-255 inclusive
+    analogWrite(TAPPER, dutyCycle);  
+}
+
 void runMotor(int delayTime, int iter) {
+  // run motor driver with delayTime in microseconds, iterate for iter times
     digitalWrite(STEP, HIGH);
     for (int i = 0; i < iter; ++i) delayMicroseconds(delayTime);
     digitalWrite(STEP, LOW);
@@ -88,43 +131,68 @@ void runMotor(int delayTime, int iter) {
 }
 
 void goToTop(int delayTime, int iter) {
+  // drive motor up until the top switch has been triggered
     digitalWrite(DIR, GO_UP);
-    while (digitalRead(TOP_SWITCH) != HIGH) {
+    while (digitalRead(TOP_SWITCH) != HIGH && !killed && !paused) {
         runMotor(delayTime, iter);  
     }
     digitalWrite(STEP, LOW);
 }
 
 void goToBottom(int delayTime, int iter) {
+  // drive motor down until the bottom switch has been triggered
     digitalWrite(DIR, GO_DOWN);
-    while (digitalRead(BOT_SWITCH) != HIGH) {
+    while (digitalRead(BOT_SWITCH) != HIGH && !killed && !paused) {
         runMotor(delayTime, iter);
     }  
     digitalWrite(STEP, LOW);
 }
 
 void goDown(int delayTime, int iter) {
+  // driver motor down
     digitalWrite(DIR, GO_DOWN);
-    while (digitalRead(BOT_SWITCH) != HIGH) runMotor(delayTime, iter);  
+    runMotor(delayTime, iter);  
 }
 
 void stop() {
+  // stop motor
     digitalWrite(STEP, LOW);  
 }
 
 // ISR
-void action() {
-    if (digitalRead(killSwitch_inter) == HIGH) {
+void power_action() {
+    if (digitalRead(power_inter) == HIGH) {
         // this means it was a RISING edge
-        // stop motor immediately, until kill switch is off again
+        // pause motor immediately, until kill switch is off again
         stop(); 
-        killed = true;
-        Serial.println("killed");
+        tap(0);
+        paused = true;
+        slow_blink();
     }  
     else {
         // this means it was a FALLING edge
         // resume program immediately  
+        paused = false;
+        no_blink();
+    }
+}
+
+// ISR
+void emergency_action() {
+    if (digitalRead(emergency_inter) == HIGH) {
+        // this means emergency has been triggered
+        // stop the motor immediately, until issue has been solved  
+        // (usually leakage)
+        stop();
+        tap(0);
+        killed = true;
+        fast_blink();
+    }  
+
+    else {
+        // this means leakage has been cleared
+        // resume program
         killed = false;
-        Serial.println("resume");
+        no_blink();  
     }
 }
